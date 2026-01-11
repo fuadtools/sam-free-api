@@ -10,28 +10,27 @@ import cv2
 
 app = FastAPI()
 
-# Load LaMa once
+# Load LaMa model once
 device = "cuda" if torch.cuda.is_available() else "cpu"
 lama_model = load_model("lama", device=device)
 
 @app.post("/clean-frame")
 async def clean_frame(file: UploadFile = File(...)):
     try:
-        # Read image
         image_bytes = await file.read()
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         img_np = np.array(img)
 
-        # Create automatic mask: detect edges / high contrast
+        # Simple automatic mask (edges/high contrast)
         gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
         edges = cv2.Canny(gray, 100, 200)
         mask_np = cv2.dilate(edges, np.ones((5,5), np.uint8), iterations=1)
         mask_img = Image.fromarray(mask_np).convert("L")
 
-        # Inpaint with LaMa
+        # Inpaint using LaMa
         cleaned_img = remove(lama_model, img, mask=mask_img)
 
-        # Return as PNG
+        # Return PNG
         buf = io.BytesIO()
         cleaned_img.save(buf, format="PNG")
         buf.seek(0)
